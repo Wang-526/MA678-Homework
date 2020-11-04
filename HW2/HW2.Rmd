@@ -1,0 +1,386 @@
+---
+title: "MA678 Homework 2 Form Yuxi Wang"
+date: "9/10/2020"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+pacman::p_load("bayesployt","knitr","arm","ggplot2","rstanarm")
+```
+
+## 11.5 
+Residuals and predictions: The folder Pyth contains outcome y and predictors x1, x2 for 40 data points, with a further 20 points with the predictors but no observed outcome. Save the file to your working directory, then read it into R using read.table().
+
+### (a) 
+Use R to fit a linear regression model predicting y from x1, x2, using the first 40 data points in the file. Summarize the inferences and check the fit of your model.
+
+```{r}
+# Loading the data and tidy it
+library("tidyverse")
+data <- read.table(file = '/Users/mac/Desktop/BU Mssp/MA678/ROS-Examples-master/Pyth/pyth.txt',sep = '\t',header = TRUE)
+tidydata <- data %>% 
+  separate(y.x1.x2, into = c("y", "x1", "x2"), sep = " ",convert = TRUE )
+y <-  tidydata[1:40,1]
+x1 <- tidydata[1:40, 2]
+x2 <- tidydata[1:40, 3]
+pyth <- data.frame(x1,x2,y)
+# Fitting the model
+fit <- stan_glm(y ~x1+x2, data=pyth,refresh=0)
+summary(fit)
+
+```
+
+### (b) 
+Display the estimated model graphically as in Figure 10.2
+
+```{r}
+# Displaying using one plot for each input variable
+plot(pyth$x1, pyth$y, xlab="X1", ylab="Y", pch=20)
+b_hat <- coef(fit)
+abline(b_hat[1] + b_hat[2], b_hat[3], col="purple")
+
+plot(pyth$x2, pyth$y, xlab="X1", ylab="Y", pch=1)
+b2_hat <- coef(fit)
+abline(b2_hat[1] + b2_hat[2], b2_hat[3], col="blue")
+
+```
+
+### (c) 
+Make a residual plot for this model. Do the assumptions appear to be met?
+
+```{r}
+# To make a residual plot
+y.res <- resid(fit)
+predicted <- predict(fit)
+plot(y.res~predicted)
+plot(y.res~pyth$y)
+# We know that for the assumption of regression analysis, the error should have Independence, Equal variance, Normality.
+# In both of these two residual plot, most of the point are in -1~1, and do not have trend.
+# So that we can briefly believe that the assumptions appear to be met.
+```
+
+
+### (d) 
+Make predictions for the remaining 20 data points in the file. How confident do you feel about these predictions?
+
+```{r}
+# Making predictions
+x11 <- tidydata[41:60, 2]
+x12 <- tidydata[41:60, 3]
+y_predictions <- coef(fit)[1] + coef(fit)[2]*x11 + coef(fit)[3]*x12
+c(y_predictions)
+
+# The confident of these predictions depend on the fit diagnostics, because we use the stan_glm function to fit the model, the mean_PPD of it is 13.6, and the sd of it is 0.2. So that we can believe the prediction is great.
+```
+
+
+## 12.5 
+Logarithmic transformation and regression: Consider the following regression: log(weight)=-3.8+2.1log(height)+error, with errors that have standard deviation 0.25. Weights are in pounds and heights are in inches.
+
+### (a) 
+Fill in the blanks: Approximately 68% of the people will have weights within a factor of __-1.28__ and __1.28__ of their predicted values from the regression.
+
+### (b) 
+Using pen and paper, sketch the regression line and scatterplot of log(weight) versus log(height) that make sense and are consistent with the fitt2ed model. Be sure to label the axes of your graph.
+
+
+## 12.6 
+Logarithmic transformations: The folder Pollution contains mortality rates and various environmental factors from 60 US metropolitan areas. For this exercise we shall model mortality rate given nitric oxides, sulfur dioxide, and hydrocarbons as inputs. this model is an extreme oversimplication, as it combines all sources of mortality and does not adjust for crucial factors such as age and smoking. We use it to illustrate log transformation in regression.  
+
+### (a) 
+create a scatterplot of mortality rate versus level of nitric oxides. Do you think linear regression will fit these data well? Fit the regression and evaluate a residual plot from the regression.
+
+```{r}
+#Loading the data
+pollution <- read.csv(file = "/Users/mac/Desktop/BU Mssp/MA678/ROS-Examples-master/Pollution/data/pollution.csv", head=TRUE)
+summary(pollution)
+
+# Creating a scatterplot of mortality rate versus level of nitric oxides
+ggplot(data=pollution, mapping= aes(x=nox, y=mort))+
+  geom_point()
+
+#linear regression will fit these data well?
+print("I donot think the linear regression will fit these data well. Unless we eliminate all points far away from the main data group. So, I think it is better to transform all data")
+
+## Fitting the model and make the plot of fitted model
+fit <- lm(mort ~ nox, data=pollution)
+summary(fit)
+ggplot(data=pollution, mapping= aes(x=nox, y=mort)) + 
+  geom_point() + 
+  stat_smooth(method="lm", formula=y ~ x, se=TRUE)
+
+# The residual plot of the model
+y.res <- resid(fit)
+predicted <- predict(fit)
+data_a <- data.frame(y.res,predicted)
+ggplot(data=data_a, mapping= aes(x=predicted, y=y.res)) + 
+  geom_point()
+```
+
+### (b) 
+Find an appropriate reansformation that will result in data more appropriate for linear regression. Fit a regression to the transformed data and evaluate the new residual plot.
+
+```{r}
+#First, try to use logarithmic method.
+fit_b <- lm(log(mort) ~ log(nox), data=pollution)
+summary(fit_b)
+
+#By using some plots to see whether the logarithmic method is well worked.
+ggplot(data=pollution, aes(x=log(nox), y=log(mort))) + 
+  geom_point() + 
+  stat_smooth(method="lm", formula=y ~ x, se=TRUE)
+y.res_b <- resid(fit_b)
+predicted_b <- predict(fit_b)
+data_b <- data.frame(y.res_b ,predicted_b)
+ggplot(data=data_b, mapping= aes(x=predicted_b, y=y.res_b)) + 
+  geom_point()
+print("In this plot, the result of the fitted plot and the residual plot are better than before.")
+```
+
+### (c) 
+Interpret the slope coefficient from the model you chose in (b)
+
+#Answer: 
+The slope coefficient in this model is 0.015893. Which means that if the variance log(nox) have 1% difference in nitric oxides, the difference in mort will get bigger in 0.0159.
+
+### (d) 
+Now fit a model predicting mortality rate using levels of nitric oxides, sulfur dioxide, and hydrocarbons as inputs. Use appropriate transformation when helpful. Plot the fitted regression model and interpret the coefficients.
+
+```{r}
+# Firstly, checking IQR for each predictors we have to use in the new model
+apply(pollution[, c("hc", "nox", "so2")], FUN=IQR, MARGIN = 2)
+
+# Then, we can scale predictors
+scale <- function(X) (X - mean(X)) / (2*sd(X))
+pollution[, c("hc_1", "nox_1", "so2_1")] <- apply(pollution[, c("hc", "nox", "so2")], FUN=scale, MARGIN = 2)
+apply(pollution[, c("hc_1", "nox_1", "so2_1")], FUN=IQR, MARGIN = 2)
+
+# In this situation, we can use linear model to fit these predictors.
+fit_d <- lm(log(mort) ~ hc_1+ nox_1 + so2_1, data=pollution)
+summary(fit_d)
+# By using some plots to see the result.
+y.res_d <- resid(fit_d)
+predicted_d <- predict(fit_d)
+data_d <- data.frame(y.res_d ,predicted_d)
+ggplot(data=data_d, mapping= aes(x=predicted_d, y=y.res_d)) + 
+  geom_point()
+
+print("The coefficients:
+     Interception: The death rate of people exposed to average levels of nitric oxide, sulfur dioxide and hydrocarbons is exp(6.84) = 934.4891
+     hc_1:  The standard deviation of hydrocarbons, and the rest are average. The corresponding mortality rate is reduced by 0.726149 times and 27%
+     nox_1: The standard deviation of nitric oxide, the rest are average, and the corresponding mortality rate is 1.34985 times higher, which is 35% higher
+     so2_1: One standard deviation difference of sulfur dioxide corresponds to a 0.03% increase in mortality")
+  
+
+```
+
+### (e) 
+Cross validate: fit the model you chose above to the first half of the data and then predict for the second half. You used all the data to construct the model in (d), so this is not really cross validation, but it gives a sense of how the steps of cross validation can be implemented.
+
+```{r}
+# seprete the data to train and test
+train <- pollution[1:30, ]
+test <- pollution[31:60, ]
+
+# To fit a linear model by using training dataset, and make a prediction
+fit_e <- lm(log(mort) ~ nox_1 + so2_1 + hc_1, data=train)
+summary(fit_e)
+prediction <- predict(fit_e, test)
+cbind(predictions=exp(prediction), observed=test$mort)
+# Finally to compute RMSE 
+sqrt(mean((test$mort-exp(prediction))^2))
+```
+
+## 12.7 
+Cross validation comparison of models with different transformations of outcomes: when we compare models with transformed continuous outcomes, we must take into account how the nonlinear transformation warps the continuous outcomes. Follow the procedure used to compare models for the mesquite bushes example on page 202.
+
+### (a) 
+Compare models for earnings and for log(earnings) given height and sex as shown in page 84 and 192. Use earnk and log(earnk) as outcomes.
+
+```{r}
+# Loading the data and reset the model from page 84 and page 192
+earnings <- read.csv(file = '/Users/mac/Desktop/BU Mssp/MA678/ROS-Examples-master/Earnings/data/earnings.csv',header = TRUE)
+earnings$earnk <- earnings$earn/1000
+fit_1 <- stan_glm(earnk ~ height + male, data=earnings, refresh=0)
+print(fit_1)
+fit_2 <- stan_glm(log(earnk) ~ height + male, data=earnings, subset=earn>0,refresh=0)
+print(fit_2)
+
+# Using the Jacobian to adjust the predictive comparison after a transformation
+loo_1 <- loo(fit_1)
+kfold_1 <- kfold(fit_1, K=10)
+loo_2_with_jacobian <- loo(fit_2)
+earnings_1 <- earnings[which(earnings$earnk>0),]
+loo_2_with_jacobian$pointwise[,1] <- loo_2_with_jacobian$pointwise[,1]-
+  log(earnings_1$earnk)
+sum(loo_2_with_jacobian$pointwise[,1])
+
+library(bayesplot)
+p1 <- posterior_predict(fit_1)
+n_sims1 <- nrow(p1)
+sims_display1 <- sample(n_sims1,100)
+p2 <- posterior_predict(fit_2)
+n_sims2 <- nrow(p2)
+sims_display2 <- sample(n_sims2,100)
+ppc_1 <- ppc_dens_overlay(earnings$earnk,p1[sims_display1,])+ theme(axis.line.y = element_blank())
+ppc_2 <- ppc_dens_overlay(log(earnings_1$earnk),p2[sims_display2,])+ theme(axis.line.y = element_blank())
+plot <- bayesplot_grid(
+  ppc_1,ppc_2,
+  grid_args = list(ncol=2)
+)
+plot
+```
+
+
+### (b) 
+Compare models from other exercises in this chapter.
+
+## 12.8 
+Log-log transformations: Suppose that, for a certain population of animals, we can predict log  weight from log height as follows:  
+
+* An animal that is 50 centimeters tall is predicted to weigh 10 kg.  
+
+* Every increase of 1% in height corresponds to a predicted increase of 2% in weight.  
+
+* The weights of approximately 95% of the animals fall within a factor of 1.1 of predicted  values.  
+
+### (a) 
+Give the equation of the regression line and the residual standard deviation of the regression.  
+
+#Answer:
+The equation of the regression line is:
+log(weight)= -5.52 + 2log(height).
+the residual standard deviation of the regression is:
+log(1.1)/2=0.0477.
+
+
+### (b) 
+Suppose the standard deviation of log weights is 20% in this population. What, then, is the $R^{2}$ of the regression model described here?  
+
+#Answer:
+To calculate it: 1-((log(1.1)/2)^2)/(0.2)^2=0.9432248
+So, R^{2} of the regression model 0.9432248
+
+## 12.9 
+Linear and logarithmic transformations: For a study of congressional elections, you would like  a measure of the relative amount of money raised by each of the two major-party candidates in  each district. Suppose that you know the amount of money raised by each candidate; label these  dollar values Di and Ri. You would like to combine these into a single variable that can be  included as an input variable into a model predicting vote share for the Democrats.  Discuss the advantages and disadvantages of the following measures:  
+
+### (a) 
+The simple difference, $D_{i}-R_{i}$  
+
+# Answer: By trying to use congressional elections data to see the outcome. It is easy to find the advantage of this simple difference that is symmetric and centered at zero.
+# However, a disadvantage of this simple difference transformation is only numbers of the difference are taken into account, not proportions. The mere difference in the number of votes cannot explain the difference in candidates. Because the total number of voters is often unknown and changes over time. If only this transformation is used for modeling, the results of the model are often not easy to interpret.
+
+
+### (b) 
+The ratio, $D_{i}/R_{i}$   
+
+# Answer: This transformation is just the opposite of the first transformation. It has advantages that is proportions. It can show the gap in percentage. At the same time, its shortcomings are asymmetrical, and also, it is centered on 1, not 0.
+
+
+### (c) 
+The difference on the logarithmic scale, $log\ D_{i}-log\ R_{i}$   
+
+# Answer: The advantage of this transformation is that it is centered at zero and symmetrical. In addition, because logarithmization is used, the difference is not sensitive to outliers. At the same time, its disadvantage is only numbers of the difference are taken into account, not proportions.
+
+### (d) 
+The relative proportion, $D_{i}/(D_{i}+R_{i})$. 
+
+#Answer: This transformation uses relative proportions. Unlike the second transformation, it has symmetry, which is its advantage. The disadvantage is that it is not centered on 0.
+
+
+## 12.11
+Elasticity: An economist runs a regression examining the relations between the average price  of cigarettes, P, and the quantity purchased, Q, across a large sample of counties in the United  States, assuming the functional form, $logQ=\alpha+\beta logP$. Suppose the estimate for $\beta$ is 0.3.  Interpret this coefficient. 
+
+#Answer：Take the Euler's Number in both sides of the equation. We can get the equation:
+#Q = (e^(alpha)) * P^(beta)
+#In this situation, for each 1% difference in cigarettes price, the predicted difference in quantity purchased is (e^(alpha)) * 0.01^(0.3).
+
+## 12.13
+Building regression models: Return to the teaching evaluations data from Exercise 10.6. Fit  regression models predicting evaluations given many of the inputs in the dataset. Consider interactions, combinations of predictors, and transformations, as appropriate. Consider several  models, discuss in detail the final model that you choose, and also explain why you chose it rather than the others you had considered. 
+
+```{r}
+prof <- read.csv("/Users/mac/Desktop/BU Mssp/MA678/ROS-Examples-master/Beauty/data/ProfEvaltnsBeautyPublic.csv")
+summary(prof)
+# Divided into several parts according to the variable's category.
+prof$profnumber <- as.factor(prof$profnumber)
+prof$female <- as.factor(prof$female)
+prof$age <- as.factor(prof$age)
+prof$class <- factor(apply(prof[ ,18:47], FUN=function(r) r %*% 1:30, MARGIN=1))
+
+
+# Making four boxplot of four main dataset.
+ggplot(data=prof, aes(x=class, y=courseevaluation)) + geom_boxplot() 
+ggplot(data=prof, aes(x=profnumber, y=courseevaluation)) + geom_boxplot()
+ggplot(data=prof, aes(x=age, y=courseevaluation)) + geom_boxplot()
+ggplot(data=prof, aes(x=female, y=courseevaluation)) + geom_boxplot()
+
+# To fit the model.
+fit_1 <- lm(courseevaluation ~ female + profnumber + class, data=prof, refresh=0)
+summary(fit_1)
+
+# plot the fitted model and its residual.
+ggplot(data=prof, mapping= aes(x=female, y=courseevaluation)) + 
+  geom_point() + 
+  stat_smooth(method="lm", formula=y ~ x, se=TRUE)
+ggplot(data=prof, mapping= aes(x=age, y=courseevaluation)) +
+  geom_point() + 
+  stat_smooth(method="lm", formula=y ~ x, se=TRUE)
+ggplot(data=prof, mapping= aes(x=profnumber, y=courseevaluation)) + 
+  geom_point() + 
+  stat_smooth(method="lm", formula=y ~ x, se=TRUE)
+ggplot(data=prof, mapping= aes(x=class, y=courseevaluation))+
+  geom_point() + 
+  stat_smooth(method="lm", formula=y ~ x, se=TRUE)
+y.res <- resid(fit_1)
+predicted <- predict(fit_1)
+data <- data.frame(y.res,predicted)
+ggplot(data=data, mapping= aes(x=predicted, y=y.res)) + 
+  geom_point()
+
+# display the number of observations for each combination of professor and class
+fit_2 <- stan_glm(courseevaluation ~ female + profevaluation, data=prof)
+summary(fit_2)
+y.res <- resid(fit_2)
+predicted <- predict(fit_2)
+data <- data.frame(y.res,predicted)
+ggplot(data=data, mapping= aes(x=predicted, y=y.res)) + 
+  geom_point()
+
+fit_3 <- stan_glm(courseevaluation ~ female + age, data=prof)
+summary(fit_3)
+y.res <- resid(fit_3)
+predicted <- predict(fit_3)
+data <- data.frame(y.res,predicted)
+ggplot(data=data, mapping= aes(x=predicted, y=y.res)) + 
+  geom_point()
+
+prof$profevaluation <- (prof$profevaluation - mean(prof$profevaluation)) / (2 * sd(prof$profevaluation))
+fit_4 <- stan_glm(courseevaluation ~ female + onecredit + profevaluation*nonenglish, data=prof, refresh=0)
+summary(fit_4)
+y.res <- resid(fit_4)
+predicted <- predict(fit_4)
+data <- data.frame(y.res,predicted)
+ggplot(data=data, mapping= aes(x=predicted, y=y.res)) + 
+  geom_point()
+
+# In this situation, I choose model 4 as my best choice. It is because in this situation, where residual plot are more likely centralized in 0, and have no trend in it, since profevaluation have a transformation.
+```
+
+
+## 12.14
+Prediction from a fitted regression: Consider one of the fitted models for mesquite leaves,  for example fit_4, in Section 12.6. Suppose you wish to use this model to make inferences  about the average mesquite yield in a new set of trees whose predictors are in data frame called  new_trees. Give R code to obtain an estimate and standard error for this population average.  You do not need to make the prediction; just give the code. 
+
+```{r}
+fit_4 <- lm(log(mort) ~ hc_1+ nox_1 + so2_1, data=pollution)
+summary(fit_4)
+# Imagine that we have a new data set called new_trees, which contain hc_new, nox_new, so2_new. So, we can:
+prediction <- predict(fit_4, data=new_trees)
+mean <- mean(prediction)
+standard_error <- sd(prediction)
+```
+
+
